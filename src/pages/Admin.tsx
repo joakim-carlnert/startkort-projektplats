@@ -50,7 +50,7 @@ export default function Admin() {
       setProjects(
         data.map((p: any) => ({
           ...p,
-          contacts: (p.contacts as Contact[]) || [],
+          contacts: (p.contacts as unknown as Contact[]) || [],
         }))
       );
     }
