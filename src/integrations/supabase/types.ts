@@ -14,7 +14,106 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      posts: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          is_done: boolean
+          project_id: string
+          role: string
+          text: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          is_done?: boolean
+          project_id: string
+          role?: string
+          text?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_done?: boolean
+          project_id?: string
+          role?: string
+          text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          address: string
+          company: string
+          contacts: Json
+          created_at: string
+          directions: string
+          id: string
+          practical_info: string
+          title: string
+        }
+        Insert: {
+          address?: string
+          company?: string
+          contacts?: Json
+          created_at?: string
+          directions?: string
+          id?: string
+          practical_info?: string
+          title: string
+        }
+        Update: {
+          address?: string
+          company?: string
+          contacts?: Json
+          created_at?: string
+          directions?: string
+          id?: string
+          practical_info?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
