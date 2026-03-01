@@ -92,7 +92,7 @@ export default function ProjectPage() {
     }
     setProject({
       ...data,
-      contacts: (data.contacts as Contact[]) || [],
+      contacts: (data.contacts as unknown as Contact[]) || [],
     });
   }
 
