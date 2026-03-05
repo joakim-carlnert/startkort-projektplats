@@ -1,10 +1,27 @@
-import { useState } from "react";
-import { getProjects, addProject, updateProject, type Contact, type Project } from "@/lib/store";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2 } from "lucide-react";
+
+interface Contact {
+  role: string;
+  name: string;
+  phone: string;
+}
+
+interface Project {
+  id: string;
+  title: string;
+  company: string;
+  address: string;
+  directions: string;
+  practical_info: string;
+  contacts: Contact[];
+  created_at: string;
+}
 
 const emptyForm = {
   title: "",
@@ -16,13 +33,25 @@ const emptyForm = {
 };
 
 export default function Admin() {
-  const [, setTick] = useState(0);
-  const rerender = () => setTick((t) => t + 1);
-
+  const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<typeof emptyForm & { id?: string }>(emptyForm);
   const [savedLink, setSavedLink] = useState<string | null>(null);
 
-  const projects = getProjects();
+  async function fetchProjects() {
+    const { data } = await supabase
+      .from("projects")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (data) {
+      setProjects(
+        data.map((p) => ({ ...p, contacts: (p.contacts as unknown as Contact[]) ?? [] }))
+      );
+    }
+  }
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
   function editProject(project: Project) {
     setForm({ ...project });
@@ -53,7 +82,7 @@ export default function Admin() {
     }));
   }
 
-  function save() {
+  async function save() {
     setSavedLink(null);
 
     const payload = {
@@ -62,19 +91,21 @@ export default function Admin() {
       address: form.address,
       directions: form.directions,
       practical_info: form.practical_info,
-      contacts: form.contacts,
+      contacts: JSON.parse(JSON.stringify(form.contacts)),
     };
 
     if (form.id) {
-      updateProject(form.id, payload);
+      await supabase.from("projects").update(payload).eq("id", form.id);
       setSavedLink(`${window.location.origin}/project/${form.id}`);
     } else {
-      const created = addProject(payload);
-      setSavedLink(`${window.location.origin}/project/${created.id}`);
+      const { data } = await supabase.from("projects").insert(payload).select().single();
+      if (data) {
+        setSavedLink(`${window.location.origin}/project/${data.id}`);
+      }
     }
 
     setForm({ ...emptyForm, contacts: [] });
-    rerender();
+    fetchProjects();
   }
 
   return (
