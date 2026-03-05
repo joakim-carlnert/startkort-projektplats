@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { getProjectById, getPostsByProject, getQuestionsByProject, addPost, addQuestion } from "@/lib/store";
+import { supabase } from "@/integrations/supabase/client";
 import { formatSwedishDate } from "@/lib/formatSwedishDate";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Camera, Check } from "lucide-react";
 
+interface Contact {
+  role: string;
+  name: string;
+  phone: string;
+}
+
+interface Project {
+  id: string;
+  title: string;
+  company: string;
+  address: string;
+  directions: string;
+  practical_info: string;
+  contacts: Contact[];
+  created_at: string;
+}
+
+interface Post {
+  id: string;
+  project_id: string;
+  image_url: string;
+  text: string | null;
+  role: string;
+  is_done: boolean;
+  created_at: string;
+}
+
+interface Question {
+  id: string;
+  project_id: string;
+  text: string;
+  created_at: string;
+}
+
 const ROLES = [
   "Snickare", "Elektriker", "VVS", "Målare",
   "Plattsättare", "Golvläggare", "UE", "Arbetsledning", "Annat…",
@@ -18,8 +52,11 @@ const ROLES = [
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
-  const [, setTick] = useState(0);
-  const rerender = () => setTick((t) => t + 1);
+
+  const [project, setProject] = useState<Project | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [showPostDialog, setShowPostDialog] = useState(false);
   const [questionText, setQuestionText] = useState("");
@@ -32,17 +69,42 @@ export default function ProjectPage() {
   const [customRole, setCustomRole] = useState("");
   const [isDone, setIsDone] = useState(false);
 
-  const project = id ? getProjectById(id) : undefined;
-  const posts = id ? getPostsByProject(id) : [];
-  const questions = id ? getQuestionsByProject(id) : [];
-
-  if (!id || !project) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground">{!id ? "Laddar..." : "Projektet hittades inte."}</p>
-      </div>
-    );
+  async function fetchProject() {
+    if (!id) return;
+    const { data } = await supabase.from("projects").select("*").eq("id", id).single();
+    if (data) {
+      setProject({ ...data, contacts: (data.contacts as unknown as Contact[]) ?? [] });
+    }
   }
+
+  async function fetchPosts() {
+    if (!id) return;
+    const { data } = await supabase
+      .from("posts")
+      .select("*")
+      .eq("project_id", id)
+      .order("created_at", { ascending: false });
+    if (data) setPosts(data);
+  }
+
+  async function fetchQuestions() {
+    if (!id) return;
+    const { data } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("project_id", id)
+      .order("created_at", { ascending: false });
+    if (data) setQuestions(data);
+  }
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      await Promise.all([fetchProject(), fetchPosts(), fetchQuestions()]);
+      setLoading(false);
+    }
+    load();
+  }, [id]);
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -51,13 +113,28 @@ export default function ProjectPage() {
     setImagePreview(URL.createObjectURL(file));
   }
 
-  function publishPost() {
-    if (!imageFile || !id || !imagePreview) return;
+  async function publishPost() {
+    if (!imageFile || !id) return;
     const finalRole = postRole === "Annat…" ? customRole : postRole;
 
-    addPost({
+    // Upload image to storage
+    const fileName = `${id}/${crypto.randomUUID()}-${imageFile.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("post-images")
+      .upload(fileName, imageFile);
+
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("post-images")
+      .getPublicUrl(fileName);
+
+    await supabase.from("posts").insert({
       project_id: id,
-      image_url: imagePreview,
+      image_url: urlData.publicUrl,
       text: postText || null,
       role: finalRole,
       is_done: isDone,
@@ -70,14 +147,33 @@ export default function ProjectPage() {
     setCustomRole("");
     setIsDone(false);
     setShowPostDialog(false);
-    rerender();
+    fetchPosts();
   }
 
-  function submitQuestion() {
+  async function submitQuestion() {
     if (!questionText.trim() || !id) return;
-    addQuestion({ project_id: id, text: questionText.trim() });
+    await supabase.from("questions").insert({
+      project_id: id,
+      text: questionText.trim(),
+    });
     setQuestionText("");
-    rerender();
+    fetchQuestions();
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Laddar...</p>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Projektet hittades inte.</p>
+      </div>
+    );
   }
 
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(project.address)}`;
