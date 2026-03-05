@@ -91,7 +91,7 @@ export default function Admin() {
       address: form.address,
       directions: form.directions,
       practical_info: form.practical_info,
-      contacts: form.contacts as unknown as Record<string, unknown>[],
+      contacts: JSON.parse(JSON.stringify(form.contacts)),
     };
 
     if (form.id) {
