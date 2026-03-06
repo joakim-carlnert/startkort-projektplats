@@ -58,16 +58,6 @@ export default function ProjectPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [showPostDialog, setShowPostDialog] = useState(false);
-  const [questionText, setQuestionText] = useState("");
-
-  // Post form state
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [postText, setPostText] = useState("");
-  const [postRole, setPostRole] = useState("");
-  const [customRole, setCustomRole] = useState("");
-  const [isDone, setIsDone] = useState(false);
 
   async function fetchProject() {
     if (!id) return;
