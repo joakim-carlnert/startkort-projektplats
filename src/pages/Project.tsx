@@ -3,13 +3,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { formatSwedishDate } from "@/lib/formatSwedishDate";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Camera, Check } from "lucide-react";
+import { Check } from "lucide-react";
 
 interface Contact {
   role: string;
@@ -45,11 +39,6 @@ interface Question {
   created_at: string;
 }
 
-const ROLES = [
-  "Snickare", "Elektriker", "VVS", "Målare",
-  "Plattsättare", "Golvläggare", "UE", "Arbetsledning", "Annat…",
-];
-
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
 
@@ -58,107 +47,24 @@ export default function ProjectPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [showPostDialog, setShowPostDialog] = useState(false);
-  const [questionText, setQuestionText] = useState("");
-
-  // Post form state
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [postText, setPostText] = useState("");
-  const [postRole, setPostRole] = useState("");
-  const [customRole, setCustomRole] = useState("");
-  const [isDone, setIsDone] = useState(false);
-
-  async function fetchProject() {
-    if (!id) return;
-    const { data } = await supabase.from("projects").select("*").eq("id", id).single();
-    if (data) {
-      setProject({ ...data, contacts: (data.contacts as unknown as Contact[]) ?? [] });
-    }
-  }
-
-  async function fetchPosts() {
-    if (!id) return;
-    const { data } = await supabase
-      .from("posts")
-      .select("*")
-      .eq("project_id", id)
-      .order("created_at", { ascending: false });
-    if (data) setPosts(data);
-  }
-
-  async function fetchQuestions() {
-    if (!id) return;
-    const { data } = await supabase
-      .from("questions")
-      .select("*")
-      .eq("project_id", id)
-      .order("created_at", { ascending: false });
-    if (data) setQuestions(data);
-  }
-
   useEffect(() => {
+    if (!id) return;
     async function load() {
       setLoading(true);
-      await Promise.all([fetchProject(), fetchPosts(), fetchQuestions()]);
+      const [projectRes, postsRes, questionsRes] = await Promise.all([
+        supabase.from("projects").select("*").eq("id", id!).single(),
+        supabase.from("posts").select("*").eq("project_id", id!).order("created_at", { ascending: false }),
+        supabase.from("questions").select("*").eq("project_id", id!).order("created_at", { ascending: false }),
+      ]);
+      if (projectRes.data) {
+        setProject({ ...projectRes.data, contacts: (projectRes.data.contacts as unknown as Contact[]) ?? [] });
+      }
+      if (postsRes.data) setPosts(postsRes.data);
+      if (questionsRes.data) setQuestions(questionsRes.data);
       setLoading(false);
     }
     load();
   }, [id]);
-
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
-  }
-
-  async function publishPost() {
-    if (!imageFile || !id) return;
-    const finalRole = postRole === "Annat…" ? customRole : postRole;
-
-    // Upload image to storage
-    const fileName = `${id}/${crypto.randomUUID()}-${imageFile.name}`;
-    const { error: uploadError } = await supabase.storage
-      .from("post-images")
-      .upload(fileName, imageFile);
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      return;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from("post-images")
-      .getPublicUrl(fileName);
-
-    await supabase.from("posts").insert({
-      project_id: id,
-      image_url: urlData.publicUrl,
-      text: postText || null,
-      role: finalRole,
-      is_done: isDone,
-    });
-
-    setImageFile(null);
-    setImagePreview(null);
-    setPostText("");
-    setPostRole("");
-    setCustomRole("");
-    setIsDone(false);
-    setShowPostDialog(false);
-    fetchPosts();
-  }
-
-  async function submitQuestion() {
-    if (!questionText.trim() || !id) return;
-    await supabase.from("questions").insert({
-      project_id: id,
-      text: questionText.trim(),
-    });
-    setQuestionText("");
-    fetchQuestions();
-  }
 
   if (loading) {
     return (
@@ -232,15 +138,6 @@ export default function ProjectPage() {
           </>
         )}
 
-        {/* Post button */}
-        <div className="py-6 text-center">
-          <Button variant="outline" onClick={() => setShowPostDialog(true)} className="gap-2">
-            <Camera className="h-4 w-4" /> Lägg upp uppdatering
-          </Button>
-        </div>
-
-        <Separator />
-
         {/* Uppdateringar */}
         <section className="py-6">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">Uppdateringar</h2>
@@ -273,9 +170,9 @@ export default function ProjectPage() {
         <section className="py-6">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">Frågor</h2>
           {questions.length === 0 ? (
-            <p className="mb-4 text-sm text-muted-foreground">Inga frågor ännu.</p>
+            <p className="text-sm text-muted-foreground">Inga frågor ännu.</p>
           ) : (
-            <div className="mb-4 space-y-3">
+            <div className="space-y-3">
               {questions.map((q) => (
                 <div key={q.id}>
                   <p className="text-sm text-foreground">{q.text}</p>
@@ -284,57 +181,8 @@ export default function ProjectPage() {
               ))}
             </div>
           )}
-          <div className="flex gap-2">
-            <Input placeholder="Skriv en fråga..." value={questionText} onChange={(e) => setQuestionText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitQuestion()} />
-            <Button variant="outline" onClick={submitQuestion} disabled={!questionText.trim()}>Ställ fråga</Button>
-          </div>
         </section>
       </div>
-
-      {/* Post Dialog */}
-      <Dialog open={showPostDialog} onOpenChange={setShowPostDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Lägg upp uppdatering</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {!imagePreview ? (
-              <label className="flex h-40 cursor-pointer items-center justify-center rounded border border-dashed border-border text-sm text-muted-foreground">
-                <div className="text-center">
-                  <Camera className="mx-auto mb-2 h-6 w-6" />
-                  <span>Ta foto eller välj bild</span>
-                </div>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-              </label>
-            ) : (
-              <div className="relative">
-                <img src={imagePreview} alt="Preview" className="w-full rounded" />
-                <button onClick={() => { setImageFile(null); setImagePreview(null); }} className="absolute right-2 top-2 rounded bg-background/80 px-2 py-1 text-xs text-foreground">Byt bild</button>
-              </div>
-            )}
-
-            <Textarea placeholder="Lägg till info (valfritt)" value={postText} onChange={(e) => setPostText(e.target.value)} />
-
-            <Select value={postRole} onValueChange={setPostRole}>
-              <SelectTrigger><SelectValue placeholder="Välj roll" /></SelectTrigger>
-              <SelectContent>
-                {ROLES.map((r) => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
-              </SelectContent>
-            </Select>
-
-            {postRole === "Annat…" && (
-              <Input placeholder="Ange roll" value={customRole} onChange={(e) => setCustomRole(e.target.value)} />
-            )}
-
-            <div className="flex items-center gap-2">
-              <Checkbox id="is-done" checked={isDone} onCheckedChange={(v) => setIsDone(v === true)} />
-              <label htmlFor="is-done" className="text-sm text-foreground">Markera som klart</label>
-            </div>
-
-            <Button onClick={publishPost} disabled={!imageFile || !postRole || (postRole === "Annat…" && !customRole)} className="w-full">Publicera</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
