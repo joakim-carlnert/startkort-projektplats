@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, LogOut } from "lucide-react";
 
 interface Contact {
   role: string;
@@ -33,9 +35,17 @@ const emptyForm = {
 };
 
 export default function Admin() {
+  const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<typeof emptyForm & { id?: string }>(emptyForm);
   const [savedLink, setSavedLink] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
 
   async function fetchProjects() {
     const { data } = await supabase
@@ -50,8 +60,8 @@ export default function Admin() {
   }
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (user) fetchProjects();
+  }, [user]);
 
   function editProject(project: Project) {
     setForm({ ...project });
@@ -108,10 +118,23 @@ export default function Admin() {
     fetchProjects();
   }
 
+  if (authLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Laddar...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-lg px-4 py-8">
-        <h1 className="mb-6 text-xl font-semibold text-foreground">Admin</h1>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-foreground">Admin</h1>
+          <button onClick={signOut} className="inline-flex items-center gap-1 text-xs text-muted-foreground underline">
+            <LogOut className="h-3 w-3" /> Logga ut
+          </button>
+        </div>
 
         <div className="space-y-4">
           <div>
