@@ -35,9 +35,17 @@ const emptyForm = {
 };
 
 export default function Admin() {
+  const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<typeof emptyForm & { id?: string }>(emptyForm);
   const [savedLink, setSavedLink] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
 
   async function fetchProjects() {
     const { data } = await supabase
@@ -52,8 +60,8 @@ export default function Admin() {
   }
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (user) fetchProjects();
+  }, [user]);
 
   function editProject(project: Project) {
     setForm({ ...project });
