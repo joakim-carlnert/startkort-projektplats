@@ -118,10 +118,23 @@ export default function Admin() {
     fetchProjects();
   }
 
+  if (authLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Laddar...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-lg px-4 py-8">
-        <h1 className="mb-6 text-xl font-semibold text-foreground">Admin</h1>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-foreground">Admin</h1>
+          <button onClick={signOut} className="inline-flex items-center gap-1 text-xs text-muted-foreground underline">
+            <LogOut className="h-3 w-3" /> Logga ut
+          </button>
+        </div>
 
         <div className="space-y-4">
           <div>
