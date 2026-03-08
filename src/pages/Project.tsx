@@ -1,9 +1,16 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { formatSwedishDate } from "@/lib/formatSwedishDate";
 import { Separator } from "@/components/ui/separator";
-import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Check, Plus, LogOut, Send } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface Contact {
   role: string;
@@ -41,30 +48,103 @@ interface Question {
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
 
   const [project, setProject] = useState<Project | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // New update form state
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [updateRole, setUpdateRole] = useState("");
+  const [updateText, setUpdateText] = useState("");
+  const [updateIsDone, setUpdateIsDone] = useState(false);
+  const [updateFile, setUpdateFile] = useState<File | null>(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+
+  // New question form state
+  const [questionText, setQuestionText] = useState("");
+  const [questionLoading, setQuestionLoading] = useState(false);
+
+  async function load() {
     if (!id) return;
-    async function load() {
-      setLoading(true);
-      const [projectRes, postsRes, questionsRes] = await Promise.all([
-        supabase.from("projects").select("*").eq("id", id!).single(),
-        supabase.from("posts").select("*").eq("project_id", id!).order("created_at", { ascending: false }),
-        supabase.from("questions").select("*").eq("project_id", id!).order("created_at", { ascending: false }),
-      ]);
-      if (projectRes.data) {
-        setProject({ ...projectRes.data, contacts: (projectRes.data.contacts as unknown as Contact[]) ?? [] });
-      }
-      if (postsRes.data) setPosts(postsRes.data);
-      if (questionsRes.data) setQuestions(questionsRes.data);
-      setLoading(false);
+    setLoading(true);
+    const [projectRes, postsRes, questionsRes] = await Promise.all([
+      supabase.from("projects").select("*").eq("id", id).single(),
+      supabase.from("posts").select("*").eq("project_id", id).order("created_at", { ascending: false }),
+      supabase.from("questions").select("*").eq("project_id", id).order("created_at", { ascending: false }),
+    ]);
+    if (projectRes.data) {
+      setProject({ ...projectRes.data, contacts: (projectRes.data.contacts as unknown as Contact[]) ?? [] });
     }
+    if (postsRes.data) setPosts(postsRes.data);
+    if (questionsRes.data) setQuestions(questionsRes.data);
+    setLoading(false);
+  }
+
+  useEffect(() => {
     load();
   }, [id]);
+
+  async function handleCreateUpdate() {
+    if (!id || !updateFile) return;
+    setUpdateLoading(true);
+
+    const fileExt = updateFile.name.split(".").pop();
+    const filePath = `${id}/${crypto.randomUUID()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("post-images")
+      .upload(filePath, updateFile);
+
+    if (uploadError) {
+      toast({ title: "Uppladdning misslyckades", description: uploadError.message, variant: "destructive" });
+      setUpdateLoading(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from("post-images").getPublicUrl(filePath);
+
+    const { error } = await supabase.from("posts").insert({
+      project_id: id,
+      image_url: urlData.publicUrl,
+      role: updateRole,
+      text: updateText || null,
+      is_done: updateIsDone,
+    });
+
+    if (error) {
+      toast({ title: "Kunde inte spara", description: error.message, variant: "destructive" });
+    } else {
+      setUpdateOpen(false);
+      setUpdateRole("");
+      setUpdateText("");
+      setUpdateIsDone(false);
+      setUpdateFile(null);
+      load();
+    }
+    setUpdateLoading(false);
+  }
+
+  async function handleAskQuestion() {
+    if (!id || !questionText.trim()) return;
+    setQuestionLoading(true);
+
+    const { error } = await supabase.from("questions").insert({
+      project_id: id,
+      text: questionText.trim(),
+    });
+
+    if (error) {
+      toast({ title: "Kunde inte spara", description: error.message, variant: "destructive" });
+    } else {
+      setQuestionText("");
+      load();
+    }
+    setQuestionLoading(false);
+  }
 
   if (loading) {
     return (
@@ -93,6 +173,11 @@ export default function ProjectPage() {
           <p className="text-xl font-semibold text-foreground">{project.title}</p>
           <p className="text-sm text-muted-foreground">{project.company}</p>
           <p className="text-sm text-muted-foreground">{project.address}</p>
+          {user && (
+            <button onClick={signOut} className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground underline">
+              <LogOut className="h-3 w-3" /> Logga ut
+            </button>
+          )}
         </div>
 
         <Separator />
@@ -140,7 +225,48 @@ export default function ProjectPage() {
 
         {/* Uppdateringar */}
         <section className="py-6">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">Uppdateringar</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Uppdateringar</h2>
+            {user && (
+              <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Plus className="mr-1 h-3 w-3" /> Ny uppdatering
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Ny uppdatering</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-sm text-muted-foreground">Bild *</label>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setUpdateFile(e.target.files?.[0] ?? null)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm text-muted-foreground">Roll</label>
+                      <Input value={updateRole} onChange={(e) => setUpdateRole(e.target.value)} placeholder="T.ex. Elektriker" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm text-muted-foreground">Text (valfri)</label>
+                      <Textarea value={updateText} onChange={(e) => setUpdateText(e.target.value)} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={updateIsDone} onCheckedChange={setUpdateIsDone} />
+                      <label className="text-sm text-muted-foreground">Klar</label>
+                    </div>
+                    <Button onClick={handleCreateUpdate} disabled={!updateFile || updateLoading} className="w-full">
+                      {updateLoading ? "Sparar..." : "Publicera"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
           {posts.length === 0 ? (
             <p className="text-sm text-muted-foreground">Inga uppdateringar ännu.</p>
           ) : (
@@ -169,6 +295,19 @@ export default function ProjectPage() {
         {/* Frågor */}
         <section className="py-6">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">Frågor</h2>
+          {user && (
+            <div className="mb-4 flex gap-2">
+              <Input
+                value={questionText}
+                onChange={(e) => setQuestionText(e.target.value)}
+                placeholder="Ställ en fråga..."
+                onKeyDown={(e) => e.key === "Enter" && handleAskQuestion()}
+              />
+              <Button size="icon" onClick={handleAskQuestion} disabled={!questionText.trim() || questionLoading}>
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           {questions.length === 0 ? (
             <p className="text-sm text-muted-foreground">Inga frågor ännu.</p>
           ) : (
