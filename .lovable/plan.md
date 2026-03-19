@@ -1,61 +1,75 @@
 
 
-# Delete Post + Undo After Posting
+# Public Project View + Share Link
 
-## Database Changes
+## Overview
+Add a public shareable project page at `/p/{slug}` and a "Copy public link" button in admin. Requires two new columns on `projects`, a new page, and admin UI updates.
 
-**Migration:** Add DELETE RLS policy on `posts` table so authenticated users can delete posts:
+## 1. Database Migration
 
 ```sql
-CREATE POLICY "Authenticated delete posts"
-ON public.posts
-FOR DELETE
-TO authenticated
-USING (true);
+ALTER TABLE public.projects
+  ADD COLUMN public_slug text UNIQUE,
+  ADD COLUMN is_public boolean NOT NULL DEFAULT true;
 ```
 
-No roles/permissions table exists, so all authenticated users can delete any post (matching the existing simple permission model). The spec mentions `created_by` checks, but the `posts` table has no `created_by` column — adding one would be a bigger change. For now, all logged-in users can delete (consistent with how all logged-in users can post).
+A database trigger will auto-generate slugs on insert:
 
-## Component Changes
+```sql
+CREATE OR REPLACE FUNCTION generate_public_slug()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.public_slug IS NULL THEN
+    NEW.public_slug := substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
-### 1. Update post rendering in `src/pages/Project.tsx`
+CREATE TRIGGER set_public_slug
+  BEFORE INSERT ON public.projects
+  FOR EACH ROW EXECUTE FUNCTION generate_public_slug();
+```
 
-For each post card in the updates feed, when user is authenticated:
-- Add a "⋯" (`MoreVertical` icon) button in the top-right corner of each post
-- Use `DropdownMenu` with a single item: "Ta bort uppdatering" (destructive styling)
-- On click → open an `AlertDialog` confirmation modal with the specified Swedish copy
-- On confirm:
-  - Optimistically remove post from state
-  - Delete row from `posts` table
-  - Extract storage path from `image_url` and delete from `post-images` bucket
-  - Show toast: "Uppdatering borttagen"
+Then backfill existing projects:
 
-### 2. Undo after posting via `QuickEventButton`
+```sql
+UPDATE public.projects SET public_slug = substr(replace(gen_random_uuid()::text, '-', ''), 1, 8) WHERE public_slug IS NULL;
+```
 
-After a successful post in `QuickEventButton`:
-- Instead of a plain success toast, show a toast with an "Ångra" action button
-- Toast visible for ~5 seconds
-- If user presses "Ångra":
-  - Delete the newly created post from `posts` table
-  - Delete image from storage
-  - Call a new `onDeleted(postId)` callback to remove from parent state
-  - Show toast: "Uppdatering ångrad"
+## 2. Create `src/pages/PublicProject.tsx`
 
-### 3. Update `src/pages/Project.tsx` parent wiring
+A new read-only page that:
+- Takes `slug` from URL params
+- Queries `projects` by `public_slug` where `is_public = true`
+- Fetches related `posts` and `questions` (read-only)
+- Renders the same layout as `Project.tsx` but with all editing/auth UI stripped:
+  - Project header (title, company, address)
+  - `<ProjectStatusBar />` with `user={null}` (hides edit button)
+  - Hitta hit, Praktiskt, Kontakt sections
+  - Updates feed (images, text, time) — no delete menu, no post button
+  - Questions list — no input form
+- If project not found or `is_public = false`: show "Detta projekt är inte publikt."
 
-- Add a `handleDeletePost` helper that removes a post by ID from state
-- Pass it as `onDeleted` to `QuickEventButton`
-- Use the same helper for the manual delete flow from the "⋯" menu
+## 3. Add Route in `src/App.tsx`
+
+```tsx
+import PublicProject from "./pages/PublicProject";
+// ...
+<Route path="/p/:slug" element={<PublicProject />} />
+```
+
+## 4. Update `src/pages/Admin.tsx`
+
+- Add `public_slug` and `is_public` to the Project interface
+- After saving a project, show a "📎 Kopiera publik länk" button next to the existing project link
+- On click: copy `{origin}/p/{public_slug}` to clipboard, show toast "Publik länk kopierad"
+- In the project list, add a small copy-link icon button per project
 
 ## Files Modified
 
-1. **New migration** — DELETE policy on `posts`
-2. **`src/pages/Project.tsx`** — Add ⋯ menu + AlertDialog per post, `handleDeletePost` helper
-3. **`src/components/QuickEventButton.tsx`** — Add `onDeleted` prop, undo toast with action button
-
-## Technical Notes
-
-- Storage path extraction: parse the public URL to get the path after `/post-images/`
-- Uses existing `DropdownMenu`, `AlertDialog` components from shadcn
-- No animation library needed — CSS `transition` on height for collapse effect
+1. **New migration** — `public_slug` column, `is_public` column, trigger, backfill
+2. **New `src/pages/PublicProject.tsx`** — Read-only public view
+3. **`src/App.tsx`** — Add `/p/:slug` route
+4. **`src/pages/Admin.tsx`** — Copy public link button + updated types
 
