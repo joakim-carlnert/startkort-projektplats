@@ -117,7 +117,7 @@ export default function Admin() {
     } else {
       const { data } = await supabase.from("projects").insert(payload).select().single();
       if (data) {
-        setSavedLink(`${window.location.origin}/project/${data.id}`);
+        setSavedLink(`${window.location.origin}/project/${(data as any).id}`);
       }
     }
 
