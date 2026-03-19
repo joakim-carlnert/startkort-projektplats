@@ -9,7 +9,23 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Check, Plus, LogOut, Send } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Check, Plus, LogOut, Send, MoreVertical, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ProjectStatusBar from "@/components/ProjectStatusBar";
 import QuickEventButton from "@/components/QuickEventButton";
@@ -51,6 +67,13 @@ interface Question {
   created_at: string;
 }
 
+function extractStoragePath(imageUrl: string): string | null {
+  const marker = "/object/public/post-images/";
+  const idx = imageUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return imageUrl.substring(idx + marker.length);
+}
+
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
   const { user, signOut } = useAuth();
@@ -73,6 +96,9 @@ export default function ProjectPage() {
   const [questionText, setQuestionText] = useState("");
   const [questionLoading, setQuestionLoading] = useState(false);
 
+  // Delete confirmation state
+  const [deletePostId, setDeletePostId] = useState<string | null>(null);
+
   async function load() {
     if (!id) return;
     setLoading(true);
@@ -92,6 +118,27 @@ export default function ProjectPage() {
   useEffect(() => {
     load();
   }, [id]);
+
+  function handleDeletePost(postId: string) {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  }
+
+  async function confirmDeletePost() {
+    if (!deletePostId) return;
+    const post = posts.find((p) => p.id === deletePostId);
+    if (!post) return;
+
+    // Optimistic removal
+    handleDeletePost(deletePostId);
+    setDeletePostId(null);
+
+    const storagePath = extractStoragePath(post.image_url);
+    await supabase.from("posts").delete().eq("id", post.id);
+    if (storagePath) {
+      await supabase.storage.from("post-images").remove([storagePath]);
+    }
+    toast({ title: "Uppdatering borttagen" });
+  }
 
   async function handleCreateUpdate() {
     if (!id || !updateFile) return;
@@ -291,7 +338,29 @@ export default function ProjectPage() {
           ) : (
             <div className="space-y-6">
               {posts.map((post) => (
-                <div key={post.id}>
+                <div key={post.id} className="relative">
+                  {user && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-1 top-1 z-10 h-8 w-8 rounded-full bg-background/70 backdrop-blur-sm"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeletePostId(post.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Ta bort uppdatering
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                   <img src={post.image_url} alt="Uppdatering" className="mb-2 w-full rounded" loading="lazy" />
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium text-foreground">{post.role}</span>
@@ -347,8 +416,30 @@ export default function ProjectPage() {
           projectId={project.id}
           user={user}
           onPosted={(post) => setPosts((prev) => [post, ...prev])}
+          onDeleted={handleDeletePost}
         />
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deletePostId} onOpenChange={(open) => { if (!open) setDeletePostId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ta bort uppdatering?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Detta tar bort bilden och texten från projektets flöde.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeletePost}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Ta bort
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
