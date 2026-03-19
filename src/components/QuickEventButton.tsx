@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@supabase/supabase-js";
 
@@ -20,9 +21,17 @@ interface QuickEventButtonProps {
   projectId: string;
   user: User;
   onPosted: (post: PostData) => void;
+  onDeleted: (postId: string) => void;
 }
 
-export default function QuickEventButton({ projectId, user, onPosted }: QuickEventButtonProps) {
+function extractStoragePath(imageUrl: string): string | null {
+  const marker = "/object/public/post-images/";
+  const idx = imageUrl.indexOf(marker);
+  if (idx === -1) return null;
+  return imageUrl.substring(idx + marker.length);
+}
+
+export default function QuickEventButton({ projectId, user, onPosted, onDeleted }: QuickEventButtonProps) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -37,7 +46,6 @@ export default function QuickEventButton({ projectId, user, onPosted }: QuickEve
     setFile(f);
     setPreviewUrl(URL.createObjectURL(f));
     setOpen(true);
-    // Reset input so same file can be re-selected
     e.target.value = "";
   }
 
@@ -46,6 +54,16 @@ export default function QuickEventButton({ projectId, user, onPosted }: QuickEve
     setFile(null);
     setPreviewUrl(null);
     setText("");
+  }
+
+  async function undoPost(post: PostData) {
+    const storagePath = extractStoragePath(post.image_url);
+    await supabase.from("posts").delete().eq("id", post.id);
+    if (storagePath) {
+      await supabase.storage.from("post-images").remove([storagePath]);
+    }
+    onDeleted(post.id);
+    toast({ title: "Uppdatering ångrad" });
   }
 
   async function handlePost() {
@@ -81,8 +99,16 @@ export default function QuickEventButton({ projectId, user, onPosted }: QuickEve
       toast({ title: "Kunde inte spara", description: error.message, variant: "destructive" });
     } else if (data) {
       onPosted(data);
-      toast({ title: "Uppdatering publicerad" });
       handleCancel();
+      toast({
+        title: "Uppdatering publicerad",
+        action: (
+          <ToastAction altText="Ångra" onClick={() => undoPost(data)}>
+            Ångra
+          </ToastAction>
+        ),
+        duration: 5000,
+      });
     }
     setLoading(false);
   }
