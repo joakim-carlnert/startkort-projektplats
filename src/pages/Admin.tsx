@@ -61,7 +61,7 @@ export default function Admin() {
       .order("created_at", { ascending: false });
     if (data) {
       setProjects(
-        data.map((p) => ({ ...p, contacts: (p.contacts as unknown as Contact[]) ?? [] }))
+        data.map((p: any) => ({ ...p, contacts: (p.contacts as unknown as Contact[]) ?? [] }))
       );
     }
   }
