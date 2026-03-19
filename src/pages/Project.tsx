@@ -171,7 +171,7 @@ export default function ProjectPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-lg px-4 py-8">
+      <div className={`mx-auto max-w-lg px-4 py-8 ${user ? "pb-24" : ""}`}>
         {/* Header */}
         <div className="mb-6 text-center">
           <h1 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Startkort</h1>
