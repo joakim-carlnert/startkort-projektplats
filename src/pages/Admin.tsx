@@ -27,6 +27,8 @@ interface Project {
   status_text: string;
   status_updated_at: string | null;
   status_updated_by: string;
+  public_slug: string | null;
+  is_public: boolean;
 }
 
 const emptyForm = {
