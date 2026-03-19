@@ -209,7 +209,22 @@ export default function Admin() {
                 <p className="font-medium text-foreground">{p.title}</p>
                 <p className="text-sm text-muted-foreground">{p.company}</p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => editProject(p)}>Redigera</Button>
+              <div className="flex items-center gap-2">
+                {p.public_slug && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const url = `${window.location.origin}/p/${p.public_slug}`;
+                      navigator.clipboard.writeText(url);
+                      toast({ title: "Publik länk kopierad" });
+                    }}
+                  >
+                    <LinkIcon className="mr-1 h-3 w-3" /> 📎
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => editProject(p)}>Redigera</Button>
+              </div>
             </div>
           </div>
         ))}
