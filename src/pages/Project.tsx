@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Check, Plus, LogOut, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ProjectStatusBar from "@/components/ProjectStatusBar";
 
 interface Contact {
   role: string;
@@ -27,6 +28,9 @@ interface Project {
   practical_info: string;
   contacts: Contact[];
   created_at: string;
+  status_text: string;
+  status_updated_at: string | null;
+  status_updated_by: string;
 }
 
 interface Post {
@@ -178,6 +182,20 @@ export default function ProjectPage() {
               <LogOut className="h-3 w-3" /> Logga ut
             </button>
           )}
+        </div>
+
+        {/* Status bar */}
+        <div className="mb-6">
+          <ProjectStatusBar
+            projectId={project.id}
+            statusText={project.status_text}
+            statusUpdatedAt={project.status_updated_at}
+            statusUpdatedBy={project.status_updated_by}
+            user={user}
+            onStatusUpdated={(text, at, by) =>
+              setProject((p) => p ? { ...p, status_text: text, status_updated_at: at, status_updated_by: by } : p)
+            }
+          />
         </div>
 
         <Separator />

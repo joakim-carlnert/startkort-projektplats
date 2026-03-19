@@ -61,6 +61,9 @@ export type Database = {
           directions: string
           id: string
           practical_info: string
+          status_text: string
+          status_updated_at: string | null
+          status_updated_by: string
           title: string
         }
         Insert: {
@@ -71,6 +74,9 @@ export type Database = {
           directions?: string
           id?: string
           practical_info?: string
+          status_text?: string
+          status_updated_at?: string | null
+          status_updated_by?: string
           title: string
         }
         Update: {
@@ -81,6 +87,9 @@ export type Database = {
           directions?: string
           id?: string
           practical_info?: string
+          status_text?: string
+          status_updated_at?: string | null
+          status_updated_by?: string
           title?: string
         }
         Relationships: []
