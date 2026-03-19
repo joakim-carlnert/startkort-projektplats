@@ -23,6 +23,9 @@ interface Project {
   practical_info: string;
   contacts: Contact[];
   created_at: string;
+  status_text: string;
+  status_updated_at: string | null;
+  status_updated_by: string;
 }
 
 const emptyForm = {
