@@ -23,6 +23,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/project/:id" element={<ProjectPage />} />
+          <Route path="/p/:slug" element={<PublicProject />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

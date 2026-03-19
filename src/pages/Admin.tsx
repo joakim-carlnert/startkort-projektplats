@@ -43,6 +43,7 @@ const emptyForm = {
 export default function Admin() {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<typeof emptyForm & { id?: string }>(emptyForm);
   const [savedLink, setSavedLink] = useState<string | null>(null);
