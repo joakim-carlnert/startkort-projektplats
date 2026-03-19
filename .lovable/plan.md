@@ -1,60 +1,50 @@
 
 
-# ProjectStatusBar Component
+# QuickEventButton — Sticky Quick-Post Button
 
-## Overview
-A live status panel rendered below the project title showing the current operational situation. Editable by logged-in users, read-only for visitors. Requires three new columns on the `projects` table.
+## Decision: Reuse `posts` table
 
-## 1. Database Migration
+The spec mentions a `project_events` table, but the existing `posts` table already stores the same data (project_id, image_url, text, created_at) and feeds the "Uppdateringar" section. Creating a separate table would require merging two data sources in the feed. Instead, we will post directly to `posts` — keeping one unified updates feed. The `role` field defaults to empty and `is_done` defaults to false, which works fine.
 
-Add three columns to `projects`:
+No database migration needed.
 
-```sql
-ALTER TABLE public.projects
-  ADD COLUMN status_text text NOT NULL DEFAULT '',
-  ADD COLUMN status_updated_at timestamptz,
-  ADD COLUMN status_updated_by text NOT NULL DEFAULT '';
-```
+## Changes
 
-No new RLS policies needed — existing public read + authenticated update policies cover this.
+### 1. Create `src/components/QuickEventButton.tsx`
 
-## 2. Create `src/components/ProjectStatusBar.tsx`
+A self-contained component that handles the full flow:
 
-**Props:** `projectId`, `statusText`, `statusUpdatedAt`, `statusUpdatedBy`, `user` (from useAuth), `onStatusUpdated` (callback to refresh parent state)
+**Sticky button:**
+- Fixed at bottom center of viewport, `pb-safe` for mobile safe area
+- Full-width pill button (max-w-lg, rounded-full, primary bg, shadow-lg)
+- Label: "➕ Uppdatera projekt"
+- Only rendered when `user` is authenticated
+- Bottom padding on the page container to prevent overlap
 
-**View mode (default):**
-- Card with soft grey background (`bg-muted`), rounded corners, generous padding
-- Heading "Laget just nu" with colored dot indicator next to it:
-  - Green: updated within 8h
-  - Yellow: 8-24h
-  - Red: >24h or never updated
-- Status text in slightly larger font (`text-base`), good line height, max ~3 lines
-- Meta row: "Senast uppdaterat av {name} . {formatted time}"
-- If empty: show "Ingen lagesupp datering annu." + primary "Skriv forsta laget" button (auth only)
-- If authenticated: show "Uppdatera laget" button
+**On click:**
+- Open a hidden `<input type="file" accept="image/*">` — standard mobile picker (camera + gallery)
+- After file selected → open a Dialog with:
+  - Image preview (object-cover, rounded)
+  - Text input: placeholder "Skriv kort vad som hänt (valfritt)"
+  - Two buttons: "Posta" (primary) / "Avbryt" (ghost)
 
-**Edit mode (dialog):**
-- Modal with autofocus textarea (min-height 120px, max 300 chars)
-- Placeholder: "Skriv kort vad som galler just nu i projektet..."
-- "Spara" (primary) + "Avbryt" (secondary)
-- On save: `supabase.from('projects').update({ status_text, status_updated_at: new Date().toISOString(), status_updated_by: user.email }).eq('id', projectId)`
-- Optimistic UI update via `onStatusUpdated` callback, close dialog
-- Brief green background flash animation on successful save
+**On Posta:**
+- Upload image to `post-images` bucket
+- Insert into `posts` table (project_id, image_url, text, role: '', is_done: false)
+- Call `onPosted()` callback to refresh + optimistically prepend post
+- Close dialog, show toast "Uppdatering publicerad"
 
-## 3. Update `src/pages/Project.tsx`
+**Props:** `projectId: string`, `user: User`, `onPosted: (post: Post) => void`
 
-- Add `status_text`, `status_updated_at`, `status_updated_by` to Project interface
-- Render `<ProjectStatusBar />` directly below the header section (before the first Separator)
-- Pass current project data + user + reload callback
+### 2. Update `src/pages/Project.tsx`
 
-## 4. Update `src/pages/Admin.tsx`
+- Import and render `<QuickEventButton />` outside the scrollable container, only when user is logged in
+- Add bottom padding (`pb-20`) to the content area so the sticky button does not overlap the last section
+- Wire `onPosted` to optimistically prepend the new post to the `posts` state array
 
-- Add the new fields to the Project interface (for type consistency)
+### Technical notes
 
-## Technical Details
-
-- Uses existing `useAuth` hook, `Dialog`, `Textarea`, `Button` components
-- Activity dot: simple `<span>` with conditional `bg-green-500`/`bg-yellow-500`/`bg-red-500` classes
-- Success flash: CSS transition on background color using a brief state toggle
-- Mobile-first: full-width card, thumb-reachable buttons, sticky save in dialog via `DialogFooter`
+- File input uses `accept="image/*"` without `capture` attribute (per project conventions — allows camera + gallery)
+- Image upload path: `{projectId}/{uuid}.{ext}` in `post-images` bucket (same as existing flow)
+- No new database tables, RLS policies, or migrations required
 
