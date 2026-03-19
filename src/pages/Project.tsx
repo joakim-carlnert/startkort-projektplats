@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Check, Plus, LogOut, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ProjectStatusBar from "@/components/ProjectStatusBar";
+import QuickEventButton from "@/components/QuickEventButton";
 
 interface Contact {
   role: string;
