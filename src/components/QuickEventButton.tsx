@@ -103,13 +103,9 @@ export default function QuickEventButton({ projectId, user, onPosted, onDeleted 
       toast({
         title: "Uppdatering publicerad",
         action: (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => undoPost(data)}
-          >
+          <ToastAction altText="Ångra" onClick={() => undoPost(data)}>
             Ångra
-          </Button>
+          </ToastAction>
         ),
         duration: 5000,
       });
