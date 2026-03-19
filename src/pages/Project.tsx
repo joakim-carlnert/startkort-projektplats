@@ -341,6 +341,14 @@ export default function ProjectPage() {
           )}
         </section>
       </div>
+
+      {user && (
+        <QuickEventButton
+          projectId={project.id}
+          user={user}
+          onPosted={(post) => setPosts((prev) => [post, ...prev])}
+        />
+      )}
     </div>
   );
 }
