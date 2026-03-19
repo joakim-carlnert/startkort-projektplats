@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Check, Plus, LogOut, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ProjectStatusBar from "@/components/ProjectStatusBar";
+import QuickEventButton from "@/components/QuickEventButton";
 
 interface Contact {
   role: string;
@@ -170,7 +171,7 @@ export default function ProjectPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-lg px-4 py-8">
+      <div className={`mx-auto max-w-lg px-4 py-8 ${user ? "pb-24" : ""}`}>
         {/* Header */}
         <div className="mb-6 text-center">
           <h1 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Startkort</h1>
@@ -340,6 +341,14 @@ export default function ProjectPage() {
           )}
         </section>
       </div>
+
+      {user && (
+        <QuickEventButton
+          projectId={project.id}
+          user={user}
+          onPosted={(post) => setPosts((prev) => [post, ...prev])}
+        />
+      )}
     </div>
   );
 }
