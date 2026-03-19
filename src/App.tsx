@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import PublicProject from "./pages/PublicProject";
 import ProjectPage from "./pages/Project";
 import NotFound from "./pages/NotFound";
 
