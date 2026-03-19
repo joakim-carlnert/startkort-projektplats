@@ -1,50 +1,61 @@
 
 
-# QuickEventButton — Sticky Quick-Post Button
+# Delete Post + Undo After Posting
 
-## Decision: Reuse `posts` table
+## Database Changes
 
-The spec mentions a `project_events` table, but the existing `posts` table already stores the same data (project_id, image_url, text, created_at) and feeds the "Uppdateringar" section. Creating a separate table would require merging two data sources in the feed. Instead, we will post directly to `posts` — keeping one unified updates feed. The `role` field defaults to empty and `is_done` defaults to false, which works fine.
+**Migration:** Add DELETE RLS policy on `posts` table so authenticated users can delete posts:
 
-No database migration needed.
+```sql
+CREATE POLICY "Authenticated delete posts"
+ON public.posts
+FOR DELETE
+TO authenticated
+USING (true);
+```
 
-## Changes
+No roles/permissions table exists, so all authenticated users can delete any post (matching the existing simple permission model). The spec mentions `created_by` checks, but the `posts` table has no `created_by` column — adding one would be a bigger change. For now, all logged-in users can delete (consistent with how all logged-in users can post).
 
-### 1. Create `src/components/QuickEventButton.tsx`
+## Component Changes
 
-A self-contained component that handles the full flow:
+### 1. Update post rendering in `src/pages/Project.tsx`
 
-**Sticky button:**
-- Fixed at bottom center of viewport, `pb-safe` for mobile safe area
-- Full-width pill button (max-w-lg, rounded-full, primary bg, shadow-lg)
-- Label: "➕ Uppdatera projekt"
-- Only rendered when `user` is authenticated
-- Bottom padding on the page container to prevent overlap
+For each post card in the updates feed, when user is authenticated:
+- Add a "⋯" (`MoreVertical` icon) button in the top-right corner of each post
+- Use `DropdownMenu` with a single item: "Ta bort uppdatering" (destructive styling)
+- On click → open an `AlertDialog` confirmation modal with the specified Swedish copy
+- On confirm:
+  - Optimistically remove post from state
+  - Delete row from `posts` table
+  - Extract storage path from `image_url` and delete from `post-images` bucket
+  - Show toast: "Uppdatering borttagen"
 
-**On click:**
-- Open a hidden `<input type="file" accept="image/*">` — standard mobile picker (camera + gallery)
-- After file selected → open a Dialog with:
-  - Image preview (object-cover, rounded)
-  - Text input: placeholder "Skriv kort vad som hänt (valfritt)"
-  - Two buttons: "Posta" (primary) / "Avbryt" (ghost)
+### 2. Undo after posting via `QuickEventButton`
 
-**On Posta:**
-- Upload image to `post-images` bucket
-- Insert into `posts` table (project_id, image_url, text, role: '', is_done: false)
-- Call `onPosted()` callback to refresh + optimistically prepend post
-- Close dialog, show toast "Uppdatering publicerad"
+After a successful post in `QuickEventButton`:
+- Instead of a plain success toast, show a toast with an "Ångra" action button
+- Toast visible for ~5 seconds
+- If user presses "Ångra":
+  - Delete the newly created post from `posts` table
+  - Delete image from storage
+  - Call a new `onDeleted(postId)` callback to remove from parent state
+  - Show toast: "Uppdatering ångrad"
 
-**Props:** `projectId: string`, `user: User`, `onPosted: (post: Post) => void`
+### 3. Update `src/pages/Project.tsx` parent wiring
 
-### 2. Update `src/pages/Project.tsx`
+- Add a `handleDeletePost` helper that removes a post by ID from state
+- Pass it as `onDeleted` to `QuickEventButton`
+- Use the same helper for the manual delete flow from the "⋯" menu
 
-- Import and render `<QuickEventButton />` outside the scrollable container, only when user is logged in
-- Add bottom padding (`pb-20`) to the content area so the sticky button does not overlap the last section
-- Wire `onPosted` to optimistically prepend the new post to the `posts` state array
+## Files Modified
 
-### Technical notes
+1. **New migration** — DELETE policy on `posts`
+2. **`src/pages/Project.tsx`** — Add ⋯ menu + AlertDialog per post, `handleDeletePost` helper
+3. **`src/components/QuickEventButton.tsx`** — Add `onDeleted` prop, undo toast with action button
 
-- File input uses `accept="image/*"` without `capture` attribute (per project conventions — allows camera + gallery)
-- Image upload path: `{projectId}/{uuid}.{ext}` in `post-images` bucket (same as existing flow)
-- No new database tables, RLS policies, or migrations required
+## Technical Notes
+
+- Storage path extraction: parse the public URL to get the path after `/post-images/`
+- Uses existing `DropdownMenu`, `AlertDialog` components from shadcn
+- No animation library needed — CSS `transition` on height for collapse effect
 
