@@ -53,10 +53,10 @@ export default function PublicProject() {
       if (!slug) return;
       setLoading(true);
 
-      const { data: proj } = await supabase
+      const { data: proj } = await (supabase
         .from("projects")
-        .select("*")
-        .eq("public_slug" as any, slug)
+        .select("*") as any)
+        .eq("public_slug", slug)
         .single();
 
       if (!proj || !(proj as any).is_public) {
