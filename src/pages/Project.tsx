@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Check, Plus, LogOut, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ProjectStatusBar from "@/components/ProjectStatusBar";
 
 interface Contact {
   role: string;
