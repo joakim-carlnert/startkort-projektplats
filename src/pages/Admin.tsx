@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, LogOut } from "lucide-react";
+import { Plus, Trash2, LogOut, Link as LinkIcon } from "lucide-react";
 
 interface Contact {
   role: string;
@@ -26,6 +27,8 @@ interface Project {
   status_text: string;
   status_updated_at: string | null;
   status_updated_by: string;
+  public_slug: string | null;
+  is_public: boolean;
 }
 
 const emptyForm = {
@@ -40,6 +43,7 @@ const emptyForm = {
 export default function Admin() {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<typeof emptyForm & { id?: string }>(emptyForm);
   const [savedLink, setSavedLink] = useState<string | null>(null);
@@ -57,7 +61,7 @@ export default function Admin() {
       .order("created_at", { ascending: false });
     if (data) {
       setProjects(
-        data.map((p) => ({ ...p, contacts: (p.contacts as unknown as Contact[]) ?? [] }))
+        data.map((p: any) => ({ ...p, contacts: (p.contacts as unknown as Contact[]) ?? [] }))
       );
     }
   }
@@ -113,7 +117,7 @@ export default function Admin() {
     } else {
       const { data } = await supabase.from("projects").insert(payload).select().single();
       if (data) {
-        setSavedLink(`${window.location.origin}/project/${data.id}`);
+        setSavedLink(`${window.location.origin}/project/${(data as any).id}`);
       }
     }
 
@@ -205,7 +209,22 @@ export default function Admin() {
                 <p className="font-medium text-foreground">{p.title}</p>
                 <p className="text-sm text-muted-foreground">{p.company}</p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => editProject(p)}>Redigera</Button>
+              <div className="flex items-center gap-2">
+                {p.public_slug && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const url = `${window.location.origin}/p/${p.public_slug}`;
+                      navigator.clipboard.writeText(url);
+                      toast({ title: "Publik länk kopierad" });
+                    }}
+                  >
+                    <LinkIcon className="mr-1 h-3 w-3" /> 📎
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => editProject(p)}>Redigera</Button>
+              </div>
             </div>
           </div>
         ))}

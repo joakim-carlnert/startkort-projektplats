@@ -60,7 +60,9 @@ export type Database = {
           created_at: string
           directions: string
           id: string
+          is_public: boolean
           practical_info: string
+          public_slug: string | null
           status_text: string
           status_updated_at: string | null
           status_updated_by: string
@@ -73,7 +75,9 @@ export type Database = {
           created_at?: string
           directions?: string
           id?: string
+          is_public?: boolean
           practical_info?: string
+          public_slug?: string | null
           status_text?: string
           status_updated_at?: string | null
           status_updated_by?: string
@@ -86,7 +90,9 @@ export type Database = {
           created_at?: string
           directions?: string
           id?: string
+          is_public?: boolean
           practical_info?: string
+          public_slug?: string | null
           status_text?: string
           status_updated_at?: string | null
           status_updated_by?: string
