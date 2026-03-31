@@ -1,34 +1,15 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { formatSwedishDate } from "@/lib/formatSwedishDate";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Check, Plus, LogOut, Send, MoreVertical, Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import ProjectStatusBar from "@/components/ProjectStatusBar";
-import QuickEventButton from "@/components/QuickEventButton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Camera, Check } from "lucide-react";
 
 interface Contact {
   role: string;
@@ -45,9 +26,6 @@ interface Project {
   practical_info: string;
   contacts: Contact[];
   created_at: string;
-  status_text: string;
-  status_updated_at: string | null;
-  status_updated_by: string;
 }
 
 interface Post {
@@ -67,135 +45,119 @@ interface Question {
   created_at: string;
 }
 
-function extractStoragePath(imageUrl: string): string | null {
-  const marker = "/object/public/post-images/";
-  const idx = imageUrl.indexOf(marker);
-  if (idx === -1) return null;
-  return imageUrl.substring(idx + marker.length);
-}
+const ROLES = [
+  "Snickare", "Elektriker", "VVS", "Målare",
+  "Plattsättare", "Golvläggare", "UE", "Arbetsledning", "Annat…",
+];
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
 
   const [project, setProject] = useState<Project | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // New update form state
-  const [updateOpen, setUpdateOpen] = useState(false);
-  const [updateRole, setUpdateRole] = useState("");
-  const [updateText, setUpdateText] = useState("");
-  const [updateIsDone, setUpdateIsDone] = useState(false);
-  const [updateFile, setUpdateFile] = useState<File | null>(null);
-  const [updateLoading, setUpdateLoading] = useState(false);
-
-  // New question form state
+  const [showPostDialog, setShowPostDialog] = useState(false);
   const [questionText, setQuestionText] = useState("");
-  const [questionLoading, setQuestionLoading] = useState(false);
 
-  // Delete confirmation state
-  const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  // Post form state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [postText, setPostText] = useState("");
+  const [postRole, setPostRole] = useState("");
+  const [customRole, setCustomRole] = useState("");
+  const [isDone, setIsDone] = useState(false);
 
-  async function load() {
+  async function fetchProject() {
     if (!id) return;
-    setLoading(true);
-    const [projectRes, postsRes, questionsRes] = await Promise.all([
-      supabase.from("projects").select("*").eq("id", id).single(),
-      supabase.from("posts").select("*").eq("project_id", id).order("created_at", { ascending: false }),
-      supabase.from("questions").select("*").eq("project_id", id).order("created_at", { ascending: false }),
-    ]);
-    if (projectRes.data) {
-      setProject({ ...projectRes.data, contacts: (projectRes.data.contacts as unknown as Contact[]) ?? [] });
+    const { data } = await supabase.from("projects").select("*").eq("id", id).single();
+    if (data) {
+      setProject({ ...data, contacts: (data.contacts as unknown as Contact[]) ?? [] });
     }
-    if (postsRes.data) setPosts(postsRes.data);
-    if (questionsRes.data) setQuestions(questionsRes.data);
-    setLoading(false);
+  }
+
+  async function fetchPosts() {
+    if (!id) return;
+    const { data } = await supabase
+      .from("posts")
+      .select("*")
+      .eq("project_id", id)
+      .order("created_at", { ascending: false });
+    if (data) setPosts(data);
+  }
+
+  async function fetchQuestions() {
+    if (!id) return;
+    const { data } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("project_id", id)
+      .order("created_at", { ascending: false });
+    if (data) setQuestions(data);
   }
 
   useEffect(() => {
+    async function load() {
+      setLoading(true);
+      await Promise.all([fetchProject(), fetchPosts(), fetchQuestions()]);
+      setLoading(false);
+    }
     load();
   }, [id]);
 
-  function handleDeletePost(postId: string) {
-    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   }
 
-  async function confirmDeletePost() {
-    if (!deletePostId) return;
-    const post = posts.find((p) => p.id === deletePostId);
-    if (!post) return;
+  async function publishPost() {
+    if (!imageFile || !id) return;
+    const finalRole = postRole === "Annat…" ? customRole : postRole;
 
-    // Optimistic removal
-    handleDeletePost(deletePostId);
-    setDeletePostId(null);
-
-    const storagePath = extractStoragePath(post.image_url);
-    await supabase.from("posts").delete().eq("id", post.id);
-    if (storagePath) {
-      await supabase.storage.from("post-images").remove([storagePath]);
-    }
-    toast({ title: "Uppdatering borttagen" });
-  }
-
-  async function handleCreateUpdate() {
-    if (!id || !updateFile) return;
-    setUpdateLoading(true);
-
-    const fileExt = updateFile.name.split(".").pop();
-    const filePath = `${id}/${crypto.randomUUID()}.${fileExt}`;
-
+    // Upload image to storage
+    const fileName = `${id}/${crypto.randomUUID()}-${imageFile.name}`;
     const { error: uploadError } = await supabase.storage
       .from("post-images")
-      .upload(filePath, updateFile);
+      .upload(fileName, imageFile);
 
     if (uploadError) {
-      toast({ title: "Uppladdning misslyckades", description: uploadError.message, variant: "destructive" });
-      setUpdateLoading(false);
+      console.error("Upload error:", uploadError);
       return;
     }
 
-    const { data: urlData } = supabase.storage.from("post-images").getPublicUrl(filePath);
+    const { data: urlData } = supabase.storage
+      .from("post-images")
+      .getPublicUrl(fileName);
 
-    const { error } = await supabase.from("posts").insert({
+    await supabase.from("posts").insert({
       project_id: id,
       image_url: urlData.publicUrl,
-      role: updateRole,
-      text: updateText || null,
-      is_done: updateIsDone,
+      text: postText || null,
+      role: finalRole,
+      is_done: isDone,
     });
 
-    if (error) {
-      toast({ title: "Kunde inte spara", description: error.message, variant: "destructive" });
-    } else {
-      setUpdateOpen(false);
-      setUpdateRole("");
-      setUpdateText("");
-      setUpdateIsDone(false);
-      setUpdateFile(null);
-      load();
-    }
-    setUpdateLoading(false);
+    setImageFile(null);
+    setImagePreview(null);
+    setPostText("");
+    setPostRole("");
+    setCustomRole("");
+    setIsDone(false);
+    setShowPostDialog(false);
+    fetchPosts();
   }
 
-  async function handleAskQuestion() {
-    if (!id || !questionText.trim()) return;
-    setQuestionLoading(true);
-
-    const { error } = await supabase.from("questions").insert({
+  async function submitQuestion() {
+    if (!questionText.trim() || !id) return;
+    await supabase.from("questions").insert({
       project_id: id,
       text: questionText.trim(),
     });
-
-    if (error) {
-      toast({ title: "Kunde inte spara", description: error.message, variant: "destructive" });
-    } else {
-      setQuestionText("");
-      load();
-    }
-    setQuestionLoading(false);
+    setQuestionText("");
+    fetchQuestions();
   }
 
   if (loading) {
@@ -218,33 +180,33 @@ export default function ProjectPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className={`mx-auto max-w-lg px-4 py-8 ${user ? "pb-24" : ""}`}>
+      <div className="mx-auto max-w-lg px-4 py-8">
         {/* Header */}
         <div className="mb-6 text-center">
           <h1 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Startkort</h1>
           <p className="text-xl font-semibold text-foreground">{project.title}</p>
           <p className="text-sm text-muted-foreground">{project.company}</p>
           <p className="text-sm text-muted-foreground">{project.address}</p>
-          {user && (
-            <button onClick={signOut} className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground underline">
-              <LogOut className="h-3 w-3" /> Logga ut
-            </button>
-          )}
         </div>
+        
 
-        {/* Status bar */}
-        <div className="mb-6">
-          <ProjectStatusBar
-            projectId={project.id}
-            statusText={project.status_text}
-            statusUpdatedAt={project.status_updated_at}
-            statusUpdatedBy={project.status_updated_by}
-            user={user}
-            onStatusUpdated={(text, at, by) =>
-              setProject((p) => p ? { ...p, status_text: text, status_updated_at: at, status_updated_by: by } : p)
-            }
-          />
-        </div>
+         <div className="mt-6 rounded-xl border border-border bg-muted/40 p-4">
+  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <span className="h-2 w-2 rounded-full bg-red-500"></span>
+    LÄGET JUST NU
+  </div>
+
+  <p className="mt-2 text-base text-foreground">
+    {posts.length > 0 ? posts[0].text || "Se senaste uppdatering" : "Ingen status"}
+  </p>
+
+  {posts.length > 0 && (
+    <p className="mt-2 text-xs text-muted-foreground">
+      Senast uppdaterad: {formatSwedishDate(posts[0].created_at)}
+    </p>
+  )}
+</div>
+
 
         <Separator />
 
@@ -289,78 +251,24 @@ export default function ProjectPage() {
           </>
         )}
 
+        {/* Post button */}
+        <div className="py-6 text-center">
+          <Button variant="outline" onClick={() => setShowPostDialog(true)} className="gap-2">
+            <Camera className="h-4 w-4" /> Lägg upp uppdatering
+          </Button>
+        </div>
+
+        <Separator />
+
         {/* Uppdateringar */}
         <section className="py-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Uppdateringar</h2>
-            {user && (
-              <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <Plus className="mr-1 h-3 w-3" /> Ny uppdatering
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Ny uppdatering</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="mb-1 block text-sm text-muted-foreground">Bild *</label>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setUpdateFile(e.target.files?.[0] ?? null)}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm text-muted-foreground">Roll</label>
-                      <Input value={updateRole} onChange={(e) => setUpdateRole(e.target.value)} placeholder="T.ex. Elektriker" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm text-muted-foreground">Text (valfri)</label>
-                      <Textarea value={updateText} onChange={(e) => setUpdateText(e.target.value)} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={updateIsDone} onCheckedChange={setUpdateIsDone} />
-                      <label className="text-sm text-muted-foreground">Klar</label>
-                    </div>
-                    <Button onClick={handleCreateUpdate} disabled={!updateFile || updateLoading} className="w-full">
-                      {updateLoading ? "Sparar..." : "Publicera"}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
-          </div>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">Uppdateringar</h2>
           {posts.length === 0 ? (
             <p className="text-sm text-muted-foreground">Inga uppdateringar ännu.</p>
           ) : (
             <div className="space-y-6">
               {posts.map((post) => (
-                <div key={post.id} className="relative">
-                  {user && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-1 top-1 z-10 h-8 w-8 rounded-full bg-background/70 backdrop-blur-sm"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setDeletePostId(post.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Ta bort uppdatering
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                <div key={post.id}>
                   <img src={post.image_url} alt="Uppdatering" className="mb-2 w-full rounded" loading="lazy" />
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium text-foreground">{post.role}</span>
@@ -383,23 +291,10 @@ export default function ProjectPage() {
         {/* Frågor */}
         <section className="py-6">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">Frågor</h2>
-          {user && (
-            <div className="mb-4 flex gap-2">
-              <Input
-                value={questionText}
-                onChange={(e) => setQuestionText(e.target.value)}
-                placeholder="Ställ en fråga..."
-                onKeyDown={(e) => e.key === "Enter" && handleAskQuestion()}
-              />
-              <Button size="icon" onClick={handleAskQuestion} disabled={!questionText.trim() || questionLoading}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
           {questions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Inga frågor ännu.</p>
+            <p className="mb-4 text-sm text-muted-foreground">Inga frågor ännu.</p>
           ) : (
-            <div className="space-y-3">
+            <div className="mb-4 space-y-3">
               {questions.map((q) => (
                 <div key={q.id}>
                   <p className="text-sm text-foreground">{q.text}</p>
@@ -408,38 +303,57 @@ export default function ProjectPage() {
               ))}
             </div>
           )}
+          <div className="flex gap-2">
+            <Input placeholder="Skriv en fråga..." value={questionText} onChange={(e) => setQuestionText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitQuestion()} />
+            <Button variant="outline" onClick={submitQuestion} disabled={!questionText.trim()}>Ställ fråga</Button>
+          </div>
         </section>
       </div>
 
-      {user && (
-        <QuickEventButton
-          projectId={project.id}
-          user={user}
-          onPosted={(post) => setPosts((prev) => [post, ...prev])}
-          onDeleted={handleDeletePost}
-        />
-      )}
+      {/* Post Dialog */}
+      <Dialog open={showPostDialog} onOpenChange={setShowPostDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Lägg upp uppdatering</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {!imagePreview ? (
+              <label className="flex h-40 cursor-pointer items-center justify-center rounded border border-dashed border-border text-sm text-muted-foreground">
+                <div className="text-center">
+                  <Camera className="mx-auto mb-2 h-6 w-6" />
+                  <span>Ta foto eller välj bild</span>
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+              </label>
+            ) : (
+              <div className="relative">
+                <img src={imagePreview} alt="Preview" className="w-full rounded" />
+                <button onClick={() => { setImageFile(null); setImagePreview(null); }} className="absolute right-2 top-2 rounded bg-background/80 px-2 py-1 text-xs text-foreground">Byt bild</button>
+              </div>
+            )}
 
-      {/* Delete confirmation dialog */}
-      <AlertDialog open={!!deletePostId} onOpenChange={(open) => { if (!open) setDeletePostId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Ta bort uppdatering?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Detta tar bort bilden och texten från projektets flöde.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeletePost}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Ta bort
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <Textarea placeholder="Lägg till info (valfritt)" value={postText} onChange={(e) => setPostText(e.target.value)} />
+
+            <Select value={postRole} onValueChange={setPostRole}>
+              <SelectTrigger><SelectValue placeholder="Välj roll" /></SelectTrigger>
+              <SelectContent>
+                {ROLES.map((r) => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
+              </SelectContent>
+            </Select>
+
+            {postRole === "Annat…" && (
+              <Input placeholder="Ange roll" value={customRole} onChange={(e) => setCustomRole(e.target.value)} />
+            )}
+
+            <div className="flex items-center gap-2">
+              <Checkbox id="is-done" checked={isDone} onCheckedChange={(v) => setIsDone(v === true)} />
+              <label htmlFor="is-done" className="text-sm text-foreground">Markera som klart</label>
+            </div>
+
+            <Button onClick={publishPost} disabled={!imageFile || !postRole || (postRole === "Annat…" && !customRole)} className="w-full">Publicera</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
