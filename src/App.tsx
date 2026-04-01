@@ -17,11 +17,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/project/:id" element={<ProjectPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/project/:id" element={<ProjectPage isAdmin={true} />} />
+            <Route path="/project/:id" element={<ProjectPage isAdmin={false} />} />
+            <Route path="/:id" element={<ProjectPage isAdmin={false} />} />
+            <Route path="*" element={<NotFound />} />
+</Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

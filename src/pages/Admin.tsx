@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface Contact {
   role: string;
@@ -29,6 +30,7 @@ const emptyForm = {
   address: "",
   directions: "",
   practical_info: "",
+  status_text: "",
   contacts: [] as Contact[],
 };
 
@@ -36,6 +38,8 @@ export default function Admin() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<typeof emptyForm & { id?: string }>(emptyForm);
   const [savedLink, setSavedLink] = useState<string | null>(null);
+
+  const navigate = useNavigate();
 
   async function fetchProjects() {
     const { data } = await supabase
@@ -91,6 +95,7 @@ export default function Admin() {
       address: form.address,
       directions: form.directions,
       practical_info: form.practical_info,
+      status_text: form.status_text,
       contacts: JSON.parse(JSON.stringify(form.contacts)),
     };
 
@@ -134,6 +139,21 @@ export default function Admin() {
             <label className="mb-1 block text-sm text-muted-foreground">Praktisk information</label>
             <Textarea value={form.practical_info} onChange={(e) => setForm((f) => ({ ...f, practical_info: e.target.value }))} rows={5} />
           </div>
+
+
+             <div>
+  <label className="mb-1 block text-sm text-muted-foreground">
+    Läget just nu
+  </label>
+  <Textarea
+    value={form.status_text || ""}
+    onChange={(e) =>
+      setForm((f) => ({ ...f, status_text: e.target.value }))
+    }
+    placeholder="T.ex. Rivning klar, väntar på VVS"
+  />
+</div>
+
 
           <Separator />
 
@@ -179,7 +199,17 @@ export default function Admin() {
                 <p className="font-medium text-foreground">{p.title}</p>
                 <p className="text-sm text-muted-foreground">{p.company}</p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => editProject(p)}>Redigera</Button>
+              <Button
+  type="button"
+  variant="outline"
+  size="sm"
+  onClick={(e) => {
+    e.preventDefault();
+    navigate(`/admin/project/${p.id}`);
+  }}
+>
+  Redigera
+</Button>
             </div>
           </div>
         ))}

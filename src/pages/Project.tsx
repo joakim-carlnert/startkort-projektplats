@@ -50,7 +50,7 @@ const ROLES = [
   "Plattsättare", "Golvläggare", "UE", "Arbetsledning", "Annat…",
 ];
 
-export default function ProjectPage() {
+export default function ProjectPage({ isAdmin = false }) {
   const { id } = useParams<{ id: string }>();
 
   const [project, setProject] = useState<Project | null>(null);
@@ -114,7 +114,7 @@ export default function ProjectPage() {
   }
 
   async function publishPost() {
-    if (!imageFile || !id) return;
+    if (!id) return;
     const finalRole = postRole === "Annat…" ? customRole : postRole;
 
     // Upload image to storage
@@ -252,11 +252,13 @@ export default function ProjectPage() {
         )}
 
         {/* Post button */}
-        <div className="py-6 text-center">
-          <Button variant="outline" onClick={() => setShowPostDialog(true)} className="gap-2">
-            <Camera className="h-4 w-4" /> Lägg upp uppdatering
-          </Button>
-        </div>
+        {isAdmin && (
+  <div className="py-6 text-center">
+    <Button variant="outline" onClick={() => setShowPostDialog(true)} className="gap-2">
+      <Camera className="h-4 w-4" /> Lägg upp uppdatering
+    </Button>
+  </div>
+)}
 
         <Separator />
 
@@ -350,7 +352,13 @@ export default function ProjectPage() {
               <label htmlFor="is-done" className="text-sm text-foreground">Markera som klart</label>
             </div>
 
-            <Button onClick={publishPost} disabled={!imageFile || !postRole || (postRole === "Annat…" && !customRole)} className="w-full">Publicera</Button>
+            <Button 
+  onClick={publishPost} 
+  disabled={!postRole || (postRole === "Annat…" && !customRole)} 
+  className="w-full"
+>
+  Publicera
+</Button>
           </div>
         </DialogContent>
       </Dialog>
