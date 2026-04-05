@@ -193,30 +193,30 @@ export default function ProjectPage({ isAdmin = false }) {
         </div>
         
 
-         <div className="mt-6 rounded-xl border border-border bg-muted/40 p-4">
+         <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4">
   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
     <span className="h-2 w-2 rounded-full bg-red-500"></span>
     LÄGET JUST NU
   </div>
 
-  <p className="mt-2 text-base text-foreground">
+  <p className="mt-2 text-base font-medium text-foreground">
     {posts.length > 0 ? posts[0].text || "Se senaste uppdatering" : "Ingen status"}
   </p>
 
   {posts.length > 0 && (
-    <p className="mt-2 text-xs text-muted-foreground">
+    <p className="mt-1 text-xs text-muted-foreground">
       Senast uppdaterad: {formatSwedishDate(posts[0].created_at)}
     </p>
   )}
+
+  <Button
+    size="sm"
+    onClick={() => setShowPostDialog(true)}
+    className="mt-3 bg-white/70 hover:bg-white text-foreground border border-blue-100"
+  >
+    Uppdatera läget
+  </Button>
 </div>
-
-
-    <Button
-  className="mt-3"
-  onClick={() => setShowPostDialog(true)}
->
-  Uppdatera läget
-</Button>
 
 
         <Separator />

@@ -48,7 +48,11 @@ export default function Admin() {
   const [form, setForm] = useState<typeof emptyForm & { id?: string }>(emptyForm);
   const [savedLink, setSavedLink] = useState<string | null>(null);
 
-
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
 
   async function fetchProjects() {
     const { data } = await supabase
@@ -121,7 +125,7 @@ export default function Admin() {
     fetchProjects();
   }
 
-  if (authLoading) {
+  if (authLoading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-muted-foreground">Laddar...</p>
