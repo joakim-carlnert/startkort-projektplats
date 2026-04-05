@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Camera, Check } from "lucide-react";
 
+
 interface Contact {
   role: string;
   name: string;
@@ -46,6 +47,14 @@ interface Question {
   created_at: string;
 }
 
+function getIndicatorColor(updatedAt: string | null) {
+  if (!updatedAt) return "bg-red-500";
+  const hours = (Date.now() - new Date(updatedAt).getTime()) / 3600000;
+  if (hours <= 8) return "bg-green-500";
+  if (hours <= 24) return "bg-yellow-500";
+  return "bg-red-500";
+}
+
 const ROLES = [
   "Snickare", "Elektriker", "VVS", "Målare",
   "Plattsättare", "Golvläggare", "UE", "Arbetsledning", "Annat…",
@@ -71,6 +80,8 @@ export default function ProjectPage({ isAdmin = false }) {
   const [postRole, setPostRole] = useState("");
   const [customRole, setCustomRole] = useState("");
   const [isDone, setIsDone] = useState(false);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
   async function fetchProject() {
     if (!id) return;
@@ -195,23 +206,23 @@ export default function ProjectPage({ isAdmin = false }) {
 
          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4">
   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-    <span className="h-2 w-2 rounded-full bg-red-500"></span>
+    <span className={`h-2 w-2 rounded-full ${getIndicatorColor((project as any).status_updated_at)}`} />
     LÄGET JUST NU
   </div>
 
   <p className="mt-2 text-base font-medium text-foreground">
-    {posts.length > 0 ? posts[0].text || "Se senaste uppdatering" : "Ingen status"}
+    {project?.status_text || "Ingen status"}
   </p>
 
-  {posts.length > 0 && (
-    <p className="mt-1 text-xs text-muted-foreground">
-      Senast uppdaterad: {formatSwedishDate(posts[0].created_at)}
-    </p>
-  )}
+  {project?.status_updated_at && (
+  <p>
+    Senast uppdaterad: {formatSwedishDate(project.status_updated_at)}
+  </p>
+)}
 
   <Button
     size="sm"
-    onClick={() => setShowPostDialog(true)}
+    onClick={() => setShowStatusDialog(true)}
     className="mt-3 bg-white/70 hover:bg-white text-foreground border border-blue-100"
   >
     Uppdatera läget
@@ -322,6 +333,58 @@ export default function ProjectPage({ isAdmin = false }) {
           </div>
         </section>
       </div>
+          
+
+      <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
+  <DialogContent className="max-w-md">
+    <DialogHeader>
+      <DialogTitle>Uppdatera läget</DialogTitle>
+    </DialogHeader>
+
+    <Textarea
+      placeholder="Skriv vad som gäller just nu..."
+      value={statusText}
+      onChange={(e) => setStatusText(e.target.value)}
+    />
+
+    <Button
+      className="w-full mt-2"
+      onClick={async () => {
+        if (!id) return;
+
+        const now = new Date().toISOString();
+
+        console.log("SPARAR:", statusText);
+
+        await supabase.from("projects").update({
+          status_text: statusText,
+          status_updated_at: now,
+          status_updated_by: user?.email || "",
+        }).eq("id", id);
+
+        
+        setProject((p) =>
+  p
+    ? {
+        ...p,
+        status_text: statusText,
+        status_updated_at: now,
+        status_updated_by: user?.email || "",
+      }
+    : p
+);
+
+
+        setShowStatusDialog(false);
+        setStatusText("");
+         // uppdaterar UI
+      }}
+    >
+      Spara
+    </Button>
+  </DialogContent>
+</Dialog>
+
 
       {/* Post Dialog */}
       <Dialog open={showPostDialog} onOpenChange={setShowPostDialog}>
