@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import ProjectPage from "./pages/Project";
 import NotFound from "./pages/NotFound";
+import Auth from "./pages/Auth";
 
 const queryClient = new QueryClient();
 
@@ -19,6 +20,7 @@ const App = () => (
         <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/auth" element={<Auth />} />
             <Route path="/admin/project/:id" element={<ProjectPage isAdmin={true} />} />
             <Route path="/project/:id" element={<ProjectPage isAdmin={false} />} />
             <Route path="/:id" element={<ProjectPage isAdmin={false} />} />

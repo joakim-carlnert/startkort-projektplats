@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Plus, Trash2, LogOut, Link as LinkIcon } from "lucide-react";
 
 interface Contact {
   role: string;
@@ -22,6 +24,11 @@ interface Project {
   practical_info: string;
   contacts: Contact[];
   created_at: string;
+  status_text: string;
+  status_updated_at: string | null;
+  status_updated_by: string;
+  public_slug: string | null;
+  is_public: boolean;
 }
 
 const emptyForm = {
@@ -30,16 +37,18 @@ const emptyForm = {
   address: "",
   directions: "",
   practical_info: "",
-  status_text: "",
   contacts: [] as Contact[],
 };
 
 export default function Admin() {
+  const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<typeof emptyForm & { id?: string }>(emptyForm);
   const [savedLink, setSavedLink] = useState<string | null>(null);
 
-  const navigate = useNavigate();
+
 
   async function fetchProjects() {
     const { data } = await supabase
@@ -48,14 +57,14 @@ export default function Admin() {
       .order("created_at", { ascending: false });
     if (data) {
       setProjects(
-        data.map((p) => ({ ...p, contacts: (p.contacts as unknown as Contact[]) ?? [] }))
+        data.map((p: any) => ({ ...p, contacts: (p.contacts as unknown as Contact[]) ?? [] }))
       );
     }
   }
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (user) fetchProjects();
+  }, [user]);
 
   function editProject(project: Project) {
     setForm({ ...project });
@@ -95,7 +104,6 @@ export default function Admin() {
       address: form.address,
       directions: form.directions,
       practical_info: form.practical_info,
-      status_text: form.status_text,
       contacts: JSON.parse(JSON.stringify(form.contacts)),
     };
 
@@ -105,7 +113,7 @@ export default function Admin() {
     } else {
       const { data } = await supabase.from("projects").insert(payload).select().single();
       if (data) {
-        setSavedLink(`${window.location.origin}/project/${data.id}`);
+        setSavedLink(`${window.location.origin}/project/${(data as any).id}`);
       }
     }
 
@@ -113,10 +121,23 @@ export default function Admin() {
     fetchProjects();
   }
 
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Laddar...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-lg px-4 py-8">
-        <h1 className="mb-6 text-xl font-semibold text-foreground">Admin</h1>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-foreground">Admin</h1>
+          <button onClick={signOut} className="inline-flex items-center gap-1 text-xs text-muted-foreground underline">
+            <LogOut className="h-3 w-3" /> Logga ut
+          </button>
+        </div>
 
         <div className="space-y-4">
           <div>
@@ -139,21 +160,6 @@ export default function Admin() {
             <label className="mb-1 block text-sm text-muted-foreground">Praktisk information</label>
             <Textarea value={form.practical_info} onChange={(e) => setForm((f) => ({ ...f, practical_info: e.target.value }))} rows={5} />
           </div>
-
-
-             <div>
-  <label className="mb-1 block text-sm text-muted-foreground">
-    Läget just nu
-  </label>
-  <Textarea
-    value={form.status_text || ""}
-    onChange={(e) =>
-      setForm((f) => ({ ...f, status_text: e.target.value }))
-    }
-    placeholder="T.ex. Rivning klar, väntar på VVS"
-  />
-</div>
-
 
           <Separator />
 
@@ -199,17 +205,22 @@ export default function Admin() {
                 <p className="font-medium text-foreground">{p.title}</p>
                 <p className="text-sm text-muted-foreground">{p.company}</p>
               </div>
-              <Button
-  type="button"
-  variant="outline"
-  size="sm"
-  onClick={(e) => {
-    e.preventDefault();
-    navigate(`/admin/project/${p.id}`);
-  }}
->
-  Redigera
-</Button>
+              <div className="flex items-center gap-2">
+                {p.public_slug && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const url = `${window.location.origin}/p/${p.public_slug}`;
+                      navigator.clipboard.writeText(url);
+                      toast({ title: "Publik länk kopierad" });
+                    }}
+                  >
+                    <LinkIcon className="mr-1 h-3 w-3" /> 📎
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => editProject(p)}>Redigera</Button>
+              </div>
             </div>
           </div>
         ))}

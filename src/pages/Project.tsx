@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/useAuth";
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,6 +53,8 @@ const ROLES = [
 
 export default function ProjectPage({ isAdmin = false }) {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+ 
 
   const [project, setProject] = useState<Project | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -208,6 +211,14 @@ export default function ProjectPage({ isAdmin = false }) {
 </div>
 
 
+    <Button
+  className="mt-3"
+  onClick={() => setShowPostDialog(true)}
+>
+  Uppdatera läget
+</Button>
+
+
         <Separator />
 
         {/* Hitta hit */}
@@ -252,13 +263,13 @@ export default function ProjectPage({ isAdmin = false }) {
         )}
 
         {/* Post button */}
-        {isAdmin && (
+        
   <div className="py-6 text-center">
     <Button variant="outline" onClick={() => setShowPostDialog(true)} className="gap-2">
       <Camera className="h-4 w-4" /> Lägg upp uppdatering
     </Button>
   </div>
-)}
+
 
         <Separator />
 
