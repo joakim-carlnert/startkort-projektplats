@@ -11,6 +11,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Camera, Check } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import { MoreVertical, Trash2 } from "lucide-react";
 
 
 interface Contact {
@@ -292,7 +300,32 @@ export default function ProjectPage({ isAdmin = false }) {
           ) : (
             <div className="space-y-6">
               {posts.map((post) => (
-                <div key={post.id}>
+                <div key={post.id} className="relative">
+
+                   {user && (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute right-1 top-1 z-10 h-8 w-8 rounded-full bg-background/70 backdrop-blur-sm"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
+
+    <DropdownMenuContent align="end">
+      <DropdownMenuItem
+        className="text-destructive"
+        onClick={() => setDeletePostId(post.id)}
+      >
+        <Trash2 className="mr-2 h-4 w-4" />
+        Ta bort uppdatering
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+)}
+
                   <img src={post.image_url} alt="Uppdatering" className="mb-2 w-full rounded" loading="lazy" />
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium text-foreground">{post.role}</span>
