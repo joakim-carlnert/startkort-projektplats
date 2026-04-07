@@ -172,6 +172,27 @@ export default function ProjectPage({ isAdmin = false }) {
     fetchPosts();
   }
 
+
+  async function deletePost(postId: string, imageUrl: string) {
+  const { error } = await supabase
+    .from("posts")
+    .delete()
+    .eq("id", postId);
+
+  if (error) {
+    console.error("Delete error:", error);
+    return;
+  }
+
+  const path = imageUrl.split("/post-images/")[1];
+  if (path) {
+    await supabase.storage.from("post-images").remove([path]);
+  }
+
+  setPosts((prev) => prev.filter((p) => p.id !== postId));
+}
+
+
   async function submitQuestion() {
     if (!questionText.trim() || !id) return;
     await supabase.from("questions").insert({
@@ -317,7 +338,7 @@ export default function ProjectPage({ isAdmin = false }) {
     <DropdownMenuContent align="end">
       <DropdownMenuItem
         className="text-destructive"
-        onClick={() => setDeletePostId(post.id)}
+        onClick={() => deletePost(post.id, post.image_url)}
       >
         <Trash2 className="mr-2 h-4 w-4" />
         Ta bort uppdatering
