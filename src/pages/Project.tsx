@@ -390,7 +390,7 @@ export default function ProjectPage({ isAdmin = false }) {
           
 
       <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
-  <DialogContent className="max-w-md">
+  <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
     <DialogHeader>
       <DialogTitle>Uppdatera läget</DialogTitle>
     </DialogHeader>
@@ -457,7 +457,11 @@ export default function ProjectPage({ isAdmin = false }) {
               </label>
             ) : (
               <div className="relative">
-                <img src={imagePreview} alt="Preview" className="w-full rounded" />
+                <img 
+             src={imagePreview} 
+             alt="Preview" 
+              className="w-full max-h-64 object-contain rounded" 
+               />
                 <button onClick={() => { setImageFile(null); setImagePreview(null); }} className="absolute right-2 top-2 rounded bg-background/80 px-2 py-1 text-xs text-foreground">Byt bild</button>
               </div>
             )}
