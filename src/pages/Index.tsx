@@ -17,7 +17,7 @@ const Index = () => {
           Gå till admin
         </Link>
 
-        <p className="text-sm text-muted-foreground text-center mt-6">
+        <p className="text-sm text-muted-foreground text-center mt-16">
           Vill du veta mer om Startkort?{" "}
           <a
             href="mailto:kontakt@startkort.se"
