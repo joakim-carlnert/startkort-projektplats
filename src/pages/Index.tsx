@@ -4,7 +4,7 @@ const Index = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="text-center">
-        <h1 className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+        <h1 className="text-4xl font-bold mb-4">
           Startkort
         </h1>
         <p className="mb-6 text-sm text-muted-foreground">
@@ -16,9 +16,21 @@ const Index = () => {
         >
           Gå till admin
         </Link>
+
+        <p className="text-sm text-muted-foreground text-center mt-6">
+          Vill du veta mer om Startkort?{" "}
+          <a
+            href="mailto:kontakt@startkort.se"
+            className="underline hover:opacity-80"
+          >
+            kontakt@startkort.se
+          </a>
+        </p>
       </div>
     </div>
   );
 };
 
 export default Index;
+
+
